@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AutoML System</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg:      #0D1117; --surface: #161B22; --surface2: #1C2128;
+    --border:  #30363D; --accent:  #58A6FF; --green:    #3FB950;
+    --orange:  #F0883E; --red:     #F85149; --purple:   #BC8CFF;
+    --yellow:  #E3B341; --text:    #E6EDF3; --sub:      #8B949E;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ─ Grid overlay ─ */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(88,166,255,.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(88,166,255,.025) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
+
+  .page { position: relative; z-index: 1; max-width: 1080px; margin: 0 auto; padding: 0 20px 80px; }
+
+  /* ─ Nav ─ */
+  nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 0; border-bottom: 1px solid var(--border); margin-bottom: 40px;
+  }
+  .logo {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px; font-weight: 600; color: var(--text);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+  .nav-tag {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--accent); background: rgba(88,166,255,.1);
+    border: 1px solid rgba(88,166,255,.25); border-radius: 20px;
+    padding: 4px 12px; letter-spacing: .5px;
+  }
+
+  /* ─ Hero ─ */
+  .hero { margin-bottom: 40px; }
+  .hero h1 {
+    font-size: clamp(26px, 4vw, 44px); font-weight: 700;
+    letter-spacing: -1px; line-height: 1.15; margin-bottom: 10px;
+  }
+  .hero h1 span { color: var(--accent); }
+  .hero p { color: var(--sub); font-size: 15px; line-height: 1.65; max-width: 520px; }
+
+  /* ─ Upload card ─ */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden;
+  }
+  .card-header {
+    padding: 16px 22px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .card-header h2 { font-size: 14px; font-weight: 600; }
+  .card-body { padding: 22px; }
+
+  .drop-zone {
+    border: 2px dashed var(--border); border-radius: 10px;
+    padding: 38px 20px; text-align: center; cursor: pointer;
+    transition: all .2s;
+  }
+  .drop-zone:hover, .drop-zone.over {
+    border-color: var(--accent);
+    background: rgba(88,166,255,.05);
+  }
+  .drop-zone input { display: none; }
+  .drop-icon { font-size: 38px; margin-bottom: 12px; }
+  .drop-title { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+  .drop-sub { font-size: 13px; color: var(--sub); }
+
+  .file-info {
+    display: none; margin-top: 14px;
+    background: rgba(63,185,80,.1); border: 1px solid rgba(63,185,80,.3);
+    border-radius: 8px; padding: 10px 14px;
+    display: none; align-items: center; gap: 10px; font-size: 13px;
+  }
+  .file-info.show { display: flex; }
+  .file-info .fname { font-weight: 600; color: var(--green); font-family: 'JetBrains Mono', monospace; }
+
+  /* ─ Options row ─ */
+  .options-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 18px;
+  }
+  .opt-group label {
+    display: block; font-size: 11px; font-weight: 600;
+    color: var(--sub); text-transform: uppercase; letter-spacing: .5px;
+    margin-bottom: 6px;
+  }
+  select, input[type=text] {
+    width: 100%; padding: 9px 12px; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 8px; color: var(--text);
+    font-size: 13px; font-family: 'Inter', sans-serif; outline: none;
+    transition: border-color .2s;
+  }
+  select:focus, input[type=text]:focus { border-color: var(--accent); }
+
+  /* ─ Run button ─ */
+  .run-btn {
+    width: 100%; margin-top: 18px; padding: 13px 20px;
+    background: var(--accent); color: #0D1117;
+    border: none; border-radius: 10px; font-size: 15px; font-weight: 700;
+    cursor: pointer; transition: all .2s; letter-spacing: -.2px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .run-btn:hover { background: #79b8ff; transform: translateY(-1px); }
+  .run-btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+  .spinner {
+    width: 16px; height: 16px; border: 2px solid rgba(0,0,0,.3);
+    border-top-color: #000; border-radius: 50%; animation: spin .7s linear infinite;
+    display: none;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ─ Pipeline steps ─ */
+  .pipeline {
+    display: flex; align-items: center; gap: 0;
+    margin: 28px 0 0; overflow-x: auto; padding-bottom: 4px;
+  }
+  .pipe-step {
+    display: flex; align-items: center; gap: 7px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 14px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--sub); flex-shrink: 0; transition: all .3s;
+  }
+  .pipe-step.active { border-color: var(--accent); color: var(--accent); background: rgba(88,166,255,.08); }
+  .pipe-step.done   { border-color: var(--green);  color: var(--green);  background: rgba(63,185,80,.08); }
+  .pipe-arrow { color: var(--border); padding: 0 6px; flex-shrink: 0; font-size: 16px; }
+
+  /* ─ Alert ─ */
+  .alert {
+    padding: 12px 16px; border-radius: 8px; font-size: 13px;
+    margin-top: 14px; display: none;
+  }
+  .alert.error   { background: rgba(248,81,73,.1); border: 1px solid rgba(248,81,73,.3); color: var(--red);    display: block; }
+  .alert.success { background: rgba(63,185,80,.1);  border: 1px solid rgba(63,185,80,.3);  color: var(--green); display: block; }
+
+  /* ─ Results section ─ */
+  #results { margin-top: 36px; display: none; }
+
+  .section-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+    color: var(--sub); text-transform: uppercase;
+    margin-bottom: 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ─ Stat grid ─ */
+  .stat-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+    margin-bottom: 24px;
+  }
+  .stat-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px;
+  }
+  .stat-box .s-label { font-size: 11px; color: var(--sub); margin-bottom: 6px; }
+  .stat-box .s-val   { font-size: 22px; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+  .s-val.accent { color: var(--accent); }
+  .s-val.green  { color: var(--green);  }
+  .s-val.orange { color: var(--orange); }
+  .s-val.purple { color: var(--purple); }
+
+  /* ─ Info grid ─ */
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+
+  .info-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px;
+  }
+  .info-card h3 { font-size: 12px; font-weight: 600; color: var(--sub); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 14px; }
+
+  .kv-row {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 7px 0; border-bottom: 1px solid rgba(48,54,61,.6);
+    font-size: 13px; gap: 12px;
+  }
+  .kv-row:last-child { border-bottom: none; }
+  .kv-key { color: var(--sub); flex-shrink: 0; }
+  .kv-val { font-family: 'JetBrains Mono', monospace; font-size: 12px; text-align: right; word-break: break-word; }
+  .kv-val.green  { color: var(--green);  font-weight: 600; }
+  .kv-val.orange { color: var(--orange); font-weight: 600; }
+  .kv-val.accent { color: var(--accent); font-weight: 600; }
+  .kv-val.purple { color: var(--purple); font-weight: 600; }
+
+  /* ─ Type badge ─ */
+  .type-badge {
+    display: inline-block; padding: 4px 14px; border-radius: 20px;
+    font-size: 12px; font-weight: 700; letter-spacing: .5px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .badge-regression     { background: rgba(88,166,255,.15); color: var(--accent); border: 1px solid rgba(88,166,255,.3); }
+  .badge-classification { background: rgba(63,185,80,.15);  color: var(--green);  border: 1px solid rgba(63,185,80,.3); }
+  .badge-clustering     { background: rgba(188,140,255,.15);color: var(--purple); border: 1px solid rgba(188,140,255,.3); }
+
+  /* ─ Algorithm chips ─ */
+  .algo-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .algo-chip {
+    padding: 5px 13px; border-radius: 6px; font-size: 12px;
+    border: 1px solid var(--border); color: var(--sub);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .algo-chip.best {
+    border-color: var(--green); color: var(--green);
+    background: rgba(63,185,80,.1); font-weight: 600;
+  }
+
+  /* ─ Preprocessing steps ─ */
+  .step-list { display: flex; flex-direction: column; gap: 6px; }
+  .step-item {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; color: var(--text);
+  }
+  .step-check {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: rgba(63,185,80,.15); border: 1px solid rgba(63,185,80,.4);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: var(--green); flex-shrink: 0;
+  }
+
+  /* ─ Chart ─ */
+  .chart-wrap {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px; margin-bottom: 24px; text-align: center;
+  }
+  .chart-wrap img { max-width: 100%; border-radius: 8px; }
+
+  /* ─ Predictions table ─ */
+  .table-wrap {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden; margin-bottom: 24px;
+  }
+  .table-header {
+    padding: 14px 18px; border-bottom: 1px solid var(--border);
+    font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    padding: 10px 16px; text-align: left; font-size: 11px; font-weight: 600;
+    color: var(--sub); text-transform: uppercase; letter-spacing: .5px;
+    background: var(--surface2); border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 10px 16px; font-size: 13px; border-bottom: 1px solid rgba(48,54,61,.4);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(88,166,255,.03); }
+  .correct   { color: var(--green); }
+  .incorrect { color: var(--red);   }
+
+  /* ─ Feature importance bars ─ */
+  .fi-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 7px 0; border-bottom: 1px solid rgba(48,54,61,.4); font-size: 13px;
+  }
+  .fi-row:last-child { border-bottom: none; }
+  .fi-name { min-width: 130px; color: var(--sub); font-size: 12px; font-family: 'JetBrains Mono', monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fi-bar-wrap { flex: 1; height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+  .fi-bar { height: 100%; border-radius: 4px; background: var(--green); transition: width .6s ease; }
+  .fi-num { font-size: 11px; color: var(--sub); min-width: 50px; text-align: right; font-family: 'JetBrains Mono', monospace; }
+
+  /* ─ Dataset preview ─ */
+  .preview-wrap {
+    overflow-x: auto; max-height: 220px; overflow-y: auto;
+    border-radius: 8px; border: 1px solid var(--border);
+  }
+  .preview-wrap td { font-size: 12px; }
+
+  /* ─ Responsive ─ */
+  @media (max-width: 680px) {
+    .stat-grid  { grid-template-columns: 1fr 1fr; }
+    .info-grid  { grid-template-columns: 1fr; }
+    .options-row{ grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Nav -->
+  <nav>
+    <div class="logo">
+      <div class="logo-dot"></div>
+      AutoML System
+    </div>
+    <span class="nav-tag">Python · Scikit-learn · Flask</span>
+  </nav>
+
+  <!-- Hero -->
+  <div class="hero">
+    <h1>Upload. Analyze. <span>Predict.</span></h1>
+    <p>Drop any CSV dataset — the system automatically detects the problem type, picks the best algorithm, trains it, and gives you real predictions and charts.</p>
+  </div>
+
+  <!-- Upload Card -->
+  <div class="card">
+    <div class="card-header">
+      <span>📂</span>
+      <h2>Dataset Upload</h2>
+    </div>
+    <div class="card-body">
+
+      <!-- Drop zone -->
+      <div class="drop-zone" id="dropZone">
+        <input type="file" id="fileInput" accept=".csv">
+        <div class="drop-icon">🗂️</div>
+        <div class="drop-title">Drop your CSV file here</div>
+        <div class="drop-sub">or click to browse · CSV format only</div>
+      </div>
+
+      <div class="file-info" id="fileInfo">
+        <span>✓</span>
+        <span class="fname" id="fileName"></span>
+        <span style="color:var(--sub);font-size:12px" id="fileSize"></span>
+      </div>
+
+      <!-- Options -->
+      <div class="options-row">
+        <div class="opt-group">
+          <label>Problem Type (optional override)</label>
+          <select id="problemType">
+            <option value="">Auto-detect</option>
+            <option value="regression">Regression</option>
+            <option value="classification">Classification</option>
+            <option value="clustering">Clustering</option>
+          </select>
+        </div>
+        <div class="opt-group">
+          <label>Target Column (optional override)</label>
+          <input type="text" id="targetCol" placeholder="e.g. price, RainTomorrow">
+        </div>
+      </div>
+
+      <!-- Run button -->
+      <button class="run-btn" id="runBtn" disabled>
+        <div class="spinner" id="spinner"></div>
+        <span id="btnText">▶ Run AutoML Analysis</span>
+      </button>
+
+      <!-- Alert -->
+      <div class="alert" id="alertBox"></div>
+
+      <!-- Pipeline steps -->
+      <div class="pipeline">
+        <div class="pipe-step" id="step1">① Upload</div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step" id="step2">② Inspect</div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step" id="step3">③ Preprocess</div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step" id="step4">④ Detect Type</div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step" id="step5">⑤ Train Model</div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step" id="step6">⑥ Results</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="results">
+
+    <!-- 1. Overview stats -->
+    <div class="section-label" style="margin-top:36px">Dataset Overview</div>
+    <div class="stat-grid" id="statGrid"></div>
+
+    <!-- 2. Detection + preprocessing -->
+    <div class="info-grid">
+      <div class="info-card" id="detectionCard">
+        <h3>🎯 Problem Detection</h3>
+        <div id="detectionBody"></div>
+      </div>
+      <div class="info-card" id="prepCard">
+        <h3>🧹 Preprocessing Steps</h3>
+        <div class="step-list" id="prepBody"></div>
+      </div>
+    </div>
+
+    <!-- 3. Algorithm selection -->
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-header"><span>⚙️</span><h2>Algorithm Selection</h2></div>
+      <div class="card-body" id="algoBody"></div>
+    </div>
+
+    <!-- 4. Performance Metrics -->
+    <div class="section-label">Performance Metrics</div>
+    <div class="stat-grid" id="metricsGrid"></div>
+
+    <!-- 5. Chart -->
+    <div class="section-label">Analysis Charts</div>
+    <div class="chart-wrap">
+      <img id="chartImg" src="" alt="Analysis Chart">
+    </div>
+
+    <!-- 6. Predictions table -->
+    <div class="section-label" id="predLabel">Sample Predictions</div>
+    <div class="table-wrap">
+      <div class="table-header">
+        <span id="predIcon">📋</span>
+        <span id="predTitle">Sample Output</span>
+      </div>
+      <div style="overflow-x:auto"><table id="predTable"></table></div>
+    </div>
+
+    <!-- 7. Feature importance -->
+    <div id="featSection" style="display:none">
+      <div class="section-label">Feature Importance</div>
+      <div class="info-card" style="margin-bottom:24px">
+        <div id="featBody"></div>
+      </div>
+    </div>
+
+    <!-- 8. Data preview -->
+    <div class="section-label">Raw Data Preview</div>
+    <div class="table-wrap">
+      <div class="table-header"><span>📄</span><span>First 8 rows</span></div>
+      <div class="preview-wrap"><table id="previewTable"></table></div>
+    </div>
+
+  </div><!-- /results -->
+
+</div><!-- /page -->
+
+<script>
+const dropZone  = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const runBtn    = document.getElementById('runBtn');
+const alertBox  = document.getElementById('alertBox');
+const results   = document.getElementById('results');
+let selectedFile = null;
+
+// ─ Drop zone ─
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('over');
+  const f = e.dataTransfer.files[0];
+  if (f) setFile(f);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
+
+function setFile(f) {
+  if (!f.name.endsWith('.csv')) { showAlert('Please upload a CSV file.', 'error'); return; }
+  selectedFile = f;
+  document.getElementById('fileName').textContent = f.name;
+  document.getElementById('fileSize').textContent = formatBytes(f.size);
+  document.getElementById('fileInfo').classList.add('show');
+  runBtn.disabled = false;
+  hideAlert();
+  markStep(1, 'done');
+}
+
+function formatBytes(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  return (b/1048576).toFixed(1) + ' MB';
+}
+
+function showAlert(msg, type) {
+  alertBox.textContent = msg;
+  alertBox.className = 'alert ' + type;
+}
+function hideAlert() { alertBox.className = 'alert'; }
+
+function markStep(n, state) {
+  const el = document.getElementById('step' + n);
+  el.classList.remove('active','done');
+  if (state) el.classList.add(state);
+}
+function resetSteps() {
+  for (let i = 1; i <= 6; i++) {
+    document.getElementById('step'+i).classList.remove('active','done');
+  }
+}
+
+// ─ Run ─
+runBtn.addEventListener('click', async () => {
+  if (!selectedFile) return;
+
+  runBtn.disabled = true;
+  document.getElementById('spinner').style.display = 'block';
+  document.getElementById('btnText').textContent = 'Analyzing...';
+  results.style.display = 'none';
+  hideAlert();
+  resetSteps();
+  markStep(1, 'done');
+
+  const steps = [2,3,4,5];
+  let si = 0;
+  const stepTimer = setInterval(() => {
+    if (si < steps.length) { markStep(steps[si], 'active'); si++; }
+  }, 600);
+
+  const fd = new FormData();
+  fd.append('file', selectedFile);
+  fd.append('problem_type', document.getElementById('problemType').value);
+  fd.append('target_column', document.getElementById('targetCol').value);
+
+  try {
+    const resp = await fetch('/analyze', { method: 'POST', body: fd });
+    const data = await resp.json();
+    clearInterval(stepTimer);
+
+    if (!resp.ok || data.error) {
+      showAlert('Error: ' + (data.error || 'Unknown error'), 'error');
+      resetSteps(); markStep(1, 'done');
+    } else {
+      for (let i = 1; i <= 5; i++) markStep(i, 'done');
+      markStep(6, 'active');
+      renderResults(data);
+      setTimeout(() => markStep(6, 'done'), 800);
+    }
+  } catch (err) {
+    clearInterval(stepTimer);
+    showAlert('Could not connect to server. Make sure app.py is running on port 5050.', 'error');
+    resetSteps(); markStep(1, 'done');
+  } finally {
+    runBtn.disabled = false;
+    document.getElementById('spinner').style.display = 'none';
+    document.getElementById('btnText').textContent = '▶ Run AutoML Analysis';
+  }
+});
+
+// ─ Render ─
+function renderResults(d) {
+  results.style.display = 'block';
+  window.scrollTo({ top: document.getElementById('results').offsetTop - 20, behavior: 'smooth' });
+
+  // 1. Stats
+  const sg = document.getElementById('statGrid');
+  sg.innerHTML = [
+    { label: 'Total Rows',  val: d.profile.rows.toLocaleString(), cls: 'accent' },
+    { label: 'Columns',     val: d.profile.cols,                  cls: 'accent' },
+    { label: 'Numeric',     val: d.profile.numeric,               cls: 'green'  },
+    { label: 'Missing vals',val: d.profile.missing,               cls: d.profile.missing > 0 ? 'orange' : 'green' },
+  ].map(s => `
+    <div class="stat-box">
+      <div class="s-label">${s.label}</div>
+      <div class="s-val ${s.cls}">${s.val}</div>
+    </div>`).join('');
+
+  // 2. Detection
+  const pb = document.getElementById('detectionBody');
+  const pColor = d.problem === 'regression' ? 'accent' : d.problem === 'classification' ? 'green' : 'purple';
+  pb.innerHTML = `
+    <div class="kv-row">
+      <span class="kv-key">Problem Type</span>
+      <span><span class="type-badge badge-${d.problem}">${d.problem.toUpperCase()}</span></span>
+    </div>
+    <div class="kv-row">
+      <span class="kv-key">Target Column</span>
+      <span class="kv-val ${pColor}">${d.target || 'None (unsupervised)'}</span>
+    </div>
+    <div class="kv-row">
+      <span class="kv-key">Algorithm Used</span>
+      <span class="kv-val green">${d.algorithm}</span>
+    </div>
+    <div class="kv-row">
+      <span class="kv-key">Categorical Cols</span>
+      <span class="kv-val accent">${d.profile.categorical}</span>
+    </div>
+  `;
+
+  // 3. Preprocessing
+  const prepB = document.getElementById('prepBody');
+  prepB.innerHTML = (d.steps || []).map(s =>
+    `<div class="step-item"><div class="step-check">✓</div><span>${s}</span></div>`
+  ).join('');
+
+  // 4. Algorithm card
+  const algB = document.getElementById('algoBody');
+  if (d.cv_scores) {
+    const chips = Object.entries(d.cv_scores).map(([name, score]) =>
+      `<div class="algo-chip ${name === d.algorithm ? 'best' : ''}">
+        ${name === d.algorithm ? '✓ ' : ''}${name}
+        <span style="margin-left:6px;opacity:.7">${(score*100).toFixed(1)}%</span>
+      </div>`
+    ).join('');
+    algB.innerHTML = `<div style="font-size:13px;color:var(--sub);margin-bottom:10px">All models evaluated via 5-fold cross-validation. Best selected automatically.</div>
+      <div class="algo-list">${chips}</div>`;
+  } else {
+    algB.innerHTML = `<div class="algo-list">
+      <div class="algo-chip best">✓ ${d.algorithm}</div>
+    </div>
+    <div style="margin-top:10px;font-size:13px;color:var(--sub)">Selected as the best-fit algorithm for this problem type.</div>`;
+  }
+
+  // 5. Metrics
+  const mg = document.getElementById('metricsGrid');
+  const metricEntries = Object.entries(d.metrics);
+  const metricColors = ['green','accent','orange','purple'];
+  mg.innerHTML = metricEntries.map(([k, v], i) => `
+    <div class="stat-box">
+      <div class="s-label">${k}</div>
+      <div class="s-val ${metricColors[i % metricColors.length]}">${v}</div>
+    </div>`).join('');
+
+  // 6. Chart
+  document.getElementById('chartImg').src = 'data:image/png;base64,' + d.chart;
+
+  // 7. Predictions table
+  const preds = d.predictions || [];
+  if (preds.length) {
+    const keys = Object.keys(preds[0]);
+    const icon = d.problem === 'clustering' ? '⚫' : '📋';
+    document.getElementById('predIcon').textContent = icon;
+    document.getElementById('predTitle').textContent =
+      d.problem === 'clustering' ? 'Sample Cluster Assignments' :
+      d.problem === 'classification' ? 'Sample Predictions vs Actual' :
+      'Sample Predictions vs Actual Values';
+
+    let thead = '<thead><tr>' + keys.map(k => `<th>${k}</th>`).join('') + '</tr></thead>';
+    let tbody = '<tbody>' + preds.map(row => {
+      const cells = keys.map(k => {
+        let cls = '';
+        if (k === 'correct') cls = row[k] ? 'correct' : 'incorrect';
+        const display = k === 'correct' ? (row[k] ? '✓ correct' : '✗ wrong') : row[k];
+        return `<td class="${cls}">${display}</td>`;
+      }).join('');
+      return '<tr>' + cells + '</tr>';
+    }).join('') + '</tbody>';
+    document.getElementById('predTable').innerHTML = thead + tbody;
+  }
+
+  // 8. Feature importance
+  const fi = d.feature_importance;
+  if (fi && fi.length) {
+    document.getElementById('featSection').style.display = 'block';
+    const maxVal = Math.max(...fi.map(f => f.importance));
+    document.getElementById('featBody').innerHTML = fi.map(f => {
+      const pct = maxVal > 0 ? (f.importance / maxVal * 100).toFixed(1) : 0;
+      return `<div class="fi-row">
+        <div class="fi-name">${f.feature}</div>
+        <div class="fi-bar-wrap"><div class="fi-bar" style="width:${pct}%"></div></div>
+        <div class="fi-num">${f.importance.toFixed(4)}</div>
+      </div>`;
+    }).join('');
+  } else {
+    document.getElementById('featSection').style.display = 'none';
+  }
+
+  // 9. Data preview table
+  const preview = d.profile.preview || [];
+  if (preview.length) {
+    const cols = Object.keys(preview[0]);
+    let html = '<thead><tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr></thead>';
+    html += '<tbody>' + preview.map(row =>
+      '<tr>' + cols.map(c => `<td>${row[c]}</td>`).join('') + '</tr>'
+    ).join('') + '</tbody>';
+    document.getElementById('previewTable').innerHTML = html;
+  }
+}
+</script>
+</body>
+</html>
